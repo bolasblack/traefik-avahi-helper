@@ -1,8 +1,14 @@
-FROM python:3.10.10-alpine3.17 as base
-LABEL maintainer="Ben Hardill hardillb@gmail.com"
-RUN apk add --no-cache --update  \
-  dbus-libs \
-  'nodejs<19'
+FROM node:22-alpine3.21 as base
+LABEL maintainer="c4605 <bolasblack@gmail.com>"
+
+ENV PYTHONUNBUFFERED=1
+
+RUN apk add --break-system-packages --update --no-cache \
+  python3 \
+  py3-pip && \
+  ln -sf python3 /usr/bin/python
+
+RUN apk add --no-cache --update dbus-libs
 
 # Install dependencies
 FROM base as compile-image
@@ -15,15 +21,14 @@ RUN apk add --no-cache --update \
     glib-dev \
     dbus \
     dbus-dev \
-    glib-dev \
     ninja \
-    'npm<10' && \
-  pip install --upgrade --no-cache-dir pip
+    python3-dev \
+    pnpm
 
-RUN pip install --user --no-cache-dir mdns-publisher
+RUN pip install --break-system-packages --user --no-cache-dir mdns-publisher
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Build application
 FROM base as build-image
@@ -31,11 +36,14 @@ FROM base as build-image
 WORKDIR /usr/src/app
 
 # app
-COPY cname.py index.js ./
+COPY cname.py cnames ./
+COPY src ./src
+
 # npm packages
 COPY --from=compile-image /usr/src/app/node_modules node_modules
+
 # pip packages
 COPY --from=compile-image /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
-CMD ["node", "index.js"]
+CMD ["node", "--experimental-strip-types", "src/index.ts"]

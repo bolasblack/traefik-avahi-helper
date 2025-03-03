@@ -2,6 +2,8 @@ node_modules
 .git
 .gitignore
 .github
+.mise.toml
+LICENSE
 Dockerfile
 *.md
-LICENSE
+*.spec.ts

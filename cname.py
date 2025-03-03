@@ -4,39 +4,14 @@ import sys
 import os
 import logging
 import logging.handlers
-import syslog
-import re
 import signal
 import functools
 
-from argparse import ArgumentParser, ArgumentTypeError
 from time import sleep
 
 from mpublisher import AvahiPublisher
 
 log = logging.getLogger("docker-to-cname");
-
-def positive_int_arg(value):
-    """Helper type (for argparse) to validate and return positive integer argument."""
-
-    try:
-        ivalue = int(value)
-    except ValueError:
-        raise ArgumentTypeError("invalid int value: %s" % repr(value))
-
-    if ivalue <= 0:
-        raise ArgumentTypeError("value must be greater than zero")
-
-    return ivalue
-
-
-def local_hostname_arg(hostname):
-    """Helper type (for argparse) to validate and return a (normalized) local hostname argument."""
-
-    if not re.match(r"^[a-z0-9][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)*\.local$", hostname, re.I):
-        raise ArgumentTypeError("malformed CNAME: %s" % repr(hostname))
-
-    return hostname.lower()
 
 
 def handle_signals(publisher, signum, frame):
@@ -78,10 +53,12 @@ def main():
             signal.signal(signal.SIGQUIT, functools.partial(handle_signals, publisher))
 
             for cname in cnames:
+                log.info("Publishing '%s'", cname)
                 status = publisher.publish_cname(cname, True)
                 if not status:
                     log.error("failed to publish '%s'", cname)
                     continue
+
             if publisher.count() == len(cnames):
                 log.info("All CNAMEs published")
             else:
